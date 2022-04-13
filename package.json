@@ -1,0 +1,25 @@
+{
+  "name": "wrestling-stat-scraper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "scraper.js",
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "public-google-sheets-parser": "^1.2.6",
+    "puppeteer": "^13.5.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MrButak/wrestling-stat-scraper.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MrButak/wrestling-stat-scraper/issues"
+  },
+  "homepage": "https://github.com/MrButak/wrestling-stat-scraper#readme"
+}
