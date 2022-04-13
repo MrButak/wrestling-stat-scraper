@@ -2,94 +2,155 @@ const puppeteer = require('puppeteer');
 config = require('dotenv').config()
 
 
-// async function getTableData() {
 
-//     try {
 
-//         let URL = 'https://www.wrestlestat.com/account/login';
+async function getFirstData() {
 
-//         // navigate to login page
-//         let browser = await puppeteer.launch({headless: false});
-//         let page = await browser.newPage();
+    try {
 
-//         await page.goto(URL);
+        let browser = await puppeteer.launch({headless: false});
+        let page = await browser.newPage();
         
-//         // login
-//         await page.type('.form-signin input[name="Username"]', '');
-//         await page.type('.form-signin input[name="Password"]', '');
-
-//         await Promise.all([
-//             page.click('.form-signin .btn'),
-//             page.waitForNavigation(),
-//         ]);
-
-//         // navigate to schedule page
-//         URL = 'https://www.wrestlestat.com/season/2022/team/1/air-force/profile';
+        // navigate to login page
+        let URL = 'https://www.wrestlestat.com/account/login';
+        await page.goto(URL);
         
-//         await page.goto(URL, {
-//             waitUntil: 'load',
-//             timeout: 0
-//         });
-//         await page.goto(URL);
+        // login
+        await page.type('.form-signin input[name="Username"]', process.env.USER_NAME);
+        await page.type('.form-signin input[name="Password"]', process.env.PASSWORD);
+
+        await Promise.all([
+            page.click('.form-signin .btn'),
+            page.waitForNavigation(),
+        ]);
+
+        let urls = ['https://www.wrestlestat.com/season/2022/team/1/air-force/profile',
+                    'https://www.wrestlestat.com/season/2022/team/2/american/profile'];
+
+        for(let i = 0; i < 1; i++) {
+            
+            // navigate to schedule page
+            URL = urls[i];
+            
+            await page.goto(URL, {
+                waitUntil: 'load',
+                timeout: 0
+            });
+
+            // block loading of resources like images and css
+            // await page.setRequestInterception(true);
+            
+            // get table data
+            let rawData = await page.evaluate(() => {
+
+                let data = [];
+                let table = document.querySelectorAll('table')
+                table = table[4]; // there are 9+ tables on the page
+
+                for (var i = 1; i < table.rows.length; i++) {
+
+                    let objCells = table.rows.item(i).cells;
+
+                    let values = [];
+                    for (var j = 0; j < objCells.length; j++) {
+                        let text = objCells.item(j).textContent;
+                        values.push(text);
+                    };
+
+                    let d = { i, values };
+                    data.push(d);
+                };
+
+                return data;
+            });
+
+            parseFirstData(rawData);
+            await page.evaluate(() => window.stop());
+        };
         
-
-//         // click on #schedule tab
-//         await Promise.all([
-//             page.click('[href="#schedule"]')
-//             // page.waitForNavigation(),
-//         ]);
-
-//         // block loading of resources like images and css
-//         await page.setRequestInterception(true);
         
-//         // get table data
-//         let rawData = await page.evaluate(() => {
+    }
 
-//             let data = [];
-//             let table = document.querySelectorAll('table')
-//             table = table[4]; // there are 9+ tables on the page
+    catch(err) {
+        console.log(err);
+    };
+};
 
-//             for (var i = 1; i < table.rows.length; i++) {
+let parseFirstData = (rawData) => {
 
-//                 let objCells = table.rows.item(i).cells;
+    let tmpStr = '';
+    let tmpCnt = 1;
+    let inCnt = 0;
+    let tmpArry = [];
+    let tmpObj = {};
 
-//                 let values = [];
-//                 for (var j = 0; j < objCells.length; j++) {
-//                     // if I choose to use .innerHTML here, I need to remove all <span> and other tags with .remove()
-//                     let text = objCells.item(j).textContent;
-//                     values.push(text);
-//                 };
+    for(let i = 0; i < rawData.length; i++) {
 
-//                 let d = { i, values };
-//                 data.push(d);
-//             };
+        inCnt = 0;
+        tmpStr = '';
+        tmpArry = [];
 
-//             return data;
-//         });
+        for(let j = 0; j < rawData[i].values.length; j++) {
 
-//         iterate(rawData)
+            if(rawData[i].values[j].includes('unofficial') || rawData[i].values[j].includes('Big 12 9th Place Matches')) {inCnt++};  
+            if(rawData[i].values[j].trim() == '') {continue};
+            tmpStr = rawData[i].values[j].trim();
+            tmpArry.push(tmpStr)
+        };
+
+        if(inCnt > 0) {continue};
+        tmpObj[tmpCnt] = tmpArry;
+        tmpCnt++;
         
-//         await browser.close();
-//     }
+    };
+    buildScheduleObjOne(tmpObj);
+    return;
+    
+};
 
-//     catch(err) {
-//         console.log(err);
-//     };
-// };
+let buildScheduleObjOne = (rawObj) => {
 
-// let iterate = (rawData) => {
-//     let tmp = '';
-//     for(let i = 0; i < rawData.length; i++) {
+    let tmpPointsArry = [];
+    let scheduleObj = {
+        type: [],
+        date: [],
+        eventName: [],
+        points: [],
+        oppName: []
+    }
+    
+    Object.keys(rawObj).forEach((key) => {
         
-//         for(let j = 0; j < rawData[i].values.length; j++) {
-//         tmp = rawData[i].values[j].trim();
-//         console.log(tmp)
-//         };
-//     };
-// };
+        
+        scheduleObj.date.push(rawObj[key][0].split('\n')[0]);
+        scheduleObj.type.push(rawObj[key][1].split('\n')[0]);
 
+        switch(rawObj[key].length) {
 
-// async function getTableData() {
+            case 5:
+                scheduleObj.eventName.push(rawObj[key][2]);
+                scheduleObj.oppName.push(null);
+                scheduleObj.points.push(null);
+                scheduleObj.points.push(null);
+                break;
+            case 6:
+                scheduleObj.eventName.push(null);
+                scheduleObj.oppName.push(rawObj[key][3].substring(rawObj[key][3].indexOf(' ') + 1));
+                tmpPointsArry.push(rawObj[key][5].split(' - ')[0]);
+                tmpPointsArry.push(rawObj[key][5].split(' - ')[1]);
+                scheduleObj.points.push(tmpPointsArry)
+                
+        };
+
+        tmpPointsArry = [];
+        
+    });
+
+    console.log(scheduleObj);
+    return;
+};
+
+// async function getFirstData() {
 
 //     try {
 
@@ -142,165 +203,11 @@ config = require('dotenv').config()
 //     };
 // };
 
-// let iterate = (rawData) => {
-
-//     for(let i = 0; i < rawData.length; i++) {
-        
-//         for(let j = 0; j < rawData[i].values.length; j++) {
-//             console.log(rawData[i].values[j].replace(/\s/g, ""));
-//         };
-//     };
-// };
 
 
+async function main() {
 
-
-async function getTableData() {
-
-    try {
-
-        let URL = 'https://www.wrestlestat.com/account/login';
-
-        // navigate to login page
-        let browser = await puppeteer.launch({headless: false});
-        let page = await browser.newPage();
-
-        await page.goto(URL);
-        
-        // login
-        await page.type('.form-signin input[name="Username"]', process.env.USER_NAME);
-        await page.type('.form-signin input[name="Password"]', process.env.PASSWORD);
-
-        await Promise.all([
-            page.click('.form-signin .btn'),
-            page.waitForNavigation(),
-        ]);
-
-        // navigate to schedule page
-        URL = 'https://www.wrestlestat.com/season/2022/team/1/air-force/profile';
-        
-        await page.goto(URL, {
-            waitUntil: 'load',
-            timeout: 0
-        });
-        await page.goto(URL);
-
-        // block loading of resources like images and css
-        await page.setRequestInterception(true);
-
-        // // click on #schedule tab
-        // await Promise.all([
-        //     page.click('[href="#schedule"]')
-        //     // page.waitForNavigation(),
-        // ]);
-
-        // // block loading of resources like images and css
-        // await page.setRequestInterception(true);
-        
-        // get table data
-        let rawData = await page.evaluate(() => {
-
-            let data = [];
-            let table = document.querySelectorAll('table')
-            table = table[4]; // there are 9+ tables on the page
-
-            for (var i = 1; i < table.rows.length; i++) {
-
-                let objCells = table.rows.item(i).cells;
-
-                let values = [];
-                for (var j = 0; j < objCells.length; j++) {
-                    let text = objCells.item(j).textContent;
-                    values.push(text);
-                };
-
-                let d = { i, values };
-                data.push(d);
-            };
-
-            return data;
-        });
-
-        parseRawData(rawData)
-        
-        await browser.close();
-    }
-
-    catch(err) {
-        console.log(err);
-    };
+    getFirstData();
 };
 
-let parseRawData = (rawData) => {
-
-    let tmpStr = '';
-    let tmpCnt = 1;
-    let inCnt = 0;
-    let tmpArry = [];
-    let tmpObj = {};
-
-    for(let i = 0; i < rawData.length; i++) {
-
-        inCnt = 0;
-        tmpStr = '';
-        tmpArry = [];
-
-        for(let j = 0; j < rawData[i].values.length; j++) {
-
-            if(rawData[i].values[j].includes('unofficial') || rawData[i].values[j].includes('Big 12 9th Place Matches')) {inCnt++};  
-            if(rawData[i].values[j].trim() == '') {continue};
-            tmpStr = rawData[i].values[j].trim();
-            tmpArry.push(tmpStr)
-        };
-
-        if(inCnt > 0) {continue};
-        tmpObj[tmpCnt] = tmpArry;
-        tmpCnt++;
-        
-    };
-    buildScheduleObj(tmpObj);
-    
-};
-
-let buildScheduleObj = (rawObj) => {
-
-    let tmpPointsArry = [];
-    let scheduleObj = {
-        type: [],
-        date: [],
-        eventName: [],
-        points: [],
-        oppName: []
-    }
-    
-    Object.keys(rawObj).forEach((key) => {
-        
-        
-        scheduleObj.date.push(rawObj[key][0].split('\n')[0]);
-        scheduleObj.type.push(rawObj[key][1].split('\n')[0]);
-
-        switch(rawObj[key].length) {
-
-            case 5:
-                scheduleObj.eventName.push(rawObj[key][2]);
-                scheduleObj.oppName.push(null);
-                scheduleObj.points.push(null);
-                scheduleObj.points.push(null);
-                break;
-            case 6:
-                scheduleObj.eventName.push(null);
-                scheduleObj.oppName.push(rawObj[key][3].substring(rawObj[key][3].indexOf(' ') + 1));
-                tmpPointsArry.push(rawObj[key][5].split(' - ')[0]);
-                tmpPointsArry.push(rawObj[key][5].split(' - ')[1]);
-                scheduleObj.points.push(tmpPointsArry)
-                
-        };
-
-        tmpPointsArry = [];
-        
-    });
-
-    console.log(scheduleObj)
-};
-
-getTableData();
+main();
