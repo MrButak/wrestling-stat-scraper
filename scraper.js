@@ -33,14 +33,19 @@ async function getFirstData() {
             page.waitForNavigation(),
         ]);
         let years = ['2022', '2020', '2018', '2016']
-        let schools = ['air-force', 'american', 'appalachian-state', 'arizona-state']
-        
-        
+        let schools = ['air-force', 'american', 'appalachian-state', 'arizona-state', 'army', 'bellarmine', 'binghamton', 'bloomsburg',
+                    'brown', 'bucknell', 'buffalo', 'cal-baptist', 'cal-poly', 'campbell', 'central-michigan', 'chattanogga', 'clarion',
+                    'cleveland-state', 'columbia', 'cornell', 'csu-bakersfield', 'davidson', 'drexel', 'duke', 'edinboro', 'franklin-and-marshall',
+                    'gardner-webb', 'george-mason', 'harvard', 'hofstra', 'illinois', 'indiana', 'iowa', 'iowa-state', 'kent-state', 'lehigh', 'little-rock',
+                    'liu', 'lock-haven', 'maryland', 'michigan', 'michigan-state', 'minnesota', 'missouri', 'navy', 'nebraska', 'north-carolina', 'north-carolina-state',
+                    'north-dakota-state', 'northern-colorado', 'northern-illinois', 'northern-iowa', 'northwestern', 'ohio', 'ohio-state', 'oregon-state',
+                    'penn-state', 'pennsylvania', 'pittsburgh', 'princeton', 'purdue', 'rider', 'rutgers', 'sacred-heart', 'south-dakota-state', 'southern-illinois-edwardsville',
+                    'stanford', 'the-citadel', 'utah-valley', 'virginia', 'virginia-tech', 'vmi', 'west-virginia', 'wisconsin', 'wyoming'];
 
         for(let i = 0; i < 1; i++) {
             
             // navigate to schedule page
-            URL = `https://www.wrestlestat.com/season/${years[0]}/team/${schools.indexOf(schools[0]) + 1}/${schools[0]}/profile`;
+            URL = `https://www.wrestlestat.com/season/${years[0]}/team/${schools.indexOf(schools[i]) + 1}/${schools[i]}/profile`;
             
             await page.goto(URL, {
                 waitUntil: 'load',
@@ -94,7 +99,6 @@ async function getFirstData() {
 
                 tmpObj[tmpCnt] = tmpArry;
                 tmpCnt++;
-                
             };
             
             
