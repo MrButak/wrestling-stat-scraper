@@ -5,6 +5,7 @@
   "main": "scraper.js",
   "dependencies": {
     "dotenv": "^16.0.0",
+    "pg": "^8.7.3",
     "public-google-sheets-parser": "^1.2.6",
     "puppeteer": "^13.5.2"
   },
