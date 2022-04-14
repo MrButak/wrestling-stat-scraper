@@ -12,14 +12,9 @@ const client = new Client({
 
 client.connect();
 
-
-async function getFirstData() {
+async function login(page) {
 
     try {
-
-        let browser = await puppeteer.launch({headless: false});
-        let page = await browser.newPage();
-        
         // navigate to login page
         let URL = 'https://www.wrestlestat.com/account/login';
         await page.goto(URL);
@@ -32,9 +27,22 @@ async function getFirstData() {
             page.click('.form-signin .btn'),
             page.waitForNavigation(),
         ]);
+    }
+
+    catch(err) {
+        console.log(err);
+    };
+
+};
+
+async function getFirstData(page) {
+
+    try {
+
+        
         let years = ['2022', '2020', '2018', '2016']
         let schools = ['air-force', 'american', 'appalachian-state', 'arizona-state', 'army', 'bellarmine', 'binghamton', 'bloomsburg',
-                    'brown', 'bucknell', 'buffalo', 'cal-baptist', 'cal-poly', 'campbell', 'central-michigan', 'chattanogga', 'clarion',
+                    'brown', '*bucknell', 'buffalo', 'cal-baptist', 'cal-poly', 'campbell', 'central-michigan', 'chattanogga', 'clarion',
                     'cleveland-state', 'columbia', 'cornell', 'csu-bakersfield', 'davidson', 'drexel', 'duke', 'edinboro', 'franklin-and-marshall',
                     'gardner-webb', 'george-mason', 'harvard', 'hofstra', 'illinois', 'indiana', 'iowa', 'iowa-state', 'kent-state', 'lehigh', 'little-rock',
                     'liu', 'lock-haven', 'maryland', 'michigan', 'michigan-state', 'minnesota', 'missouri', 'navy', 'nebraska', 'north-carolina', 'north-carolina-state',
@@ -42,10 +50,37 @@ async function getFirstData() {
                     'penn-state', 'pennsylvania', 'pittsburgh', 'princeton', 'purdue', 'rider', 'rutgers', 'sacred-heart', 'south-dakota-state', 'southern-illinois-edwardsville',
                     'stanford', 'the-citadel', 'utah-valley', 'virginia', 'virginia-tech', 'vmi', 'west-virginia', 'wisconsin', 'wyoming'];
 
-        for(let i = 0; i < 1; i++) {
+        
+        for(let i = 0; i < 80; i++) {
+            
             
             // navigate to schedule page
-            URL = `https://www.wrestlestat.com/season/${years[0]}/team/${schools.indexOf(schools[i]) + 1}/${schools[i]}/profile`;
+            if(schools[i] == 'pennsylvania') {
+                URL = 'https://www.wrestlestat.com/season/2022/team/61/pennsylvania/profile';
+            }
+            if(schools[i] == 'edinboro') {
+                URL = 'https://www.wrestlestat.com/season/2022/team/26/edinboro/profile';
+            }
+
+            if(schools[i] == 'pittsburgh') {
+                URL = 'https://www.wrestlestat.com/season/2022/team/62/pittsburgh/profile';
+            }
+            if(schools[i] == 'bloomsburg') {
+                URL = 'https://www.wrestlestat.com/season/2022/team/7/bloomsburg/profile';
+            }
+            else if(schools[i] == 'franklin-and-marshall') {
+                URL = 'https://www.wrestlestat.com/season/2022/team/27/franklin-and-marshall/profile';
+            }
+            else if(schools[i] == 'brown') {
+                URL = 'https://www.wrestlestat.com/season/2022/team/10/brown/profile';
+            }
+            else if(schools[i] == 'bucknell') {
+                URL = 'https://www.wrestlestat.com/season/2022/team/11/bucknell/profile'
+            }
+            else {
+                URL = `https://www.wrestlestat.com/season/${years[0]}/team/${i + 1}/${schools[i]}/profile`;
+            };
+            
             
             await page.goto(URL, {
                 waitUntil: 'load',
@@ -158,35 +193,44 @@ async function getFirstData() {
                 
             });
             console.log(scheduleObj);
+            console.log(URL)
+            console.log(schools[i], '^^^^^^^');
             await page.evaluate(() => window.stop());
+            // await insertInDb(scheduleObj)
         };
         
         
     }
-
     catch(err) {
         console.log(err);
     };
 };
 
 
-// async function insertInDb()  {
+async function insertInDb()  {
 
-//     const text = 'INSERT INTO purchases(stripe_pi, email, items_purchased, total_price, shipping_address, account_id) VALUES($1, $2, $3, $4, $5, $6) RETURNING *';
-//     const values = [stripePiId, email, itemsPurchased, totalPrice, shippingAddress, null];
+    const text = 'INSERT INTO purchases(stripe_pi, email, items_purchased, total_price, shipping_address, account_id) VALUES($1, $2, $3, $4, $5, $6) RETURNING *';
+    const values = [stripePiId, email, itemsPurchased, totalPrice, shippingAddress, null];
 
-//     try {
-//         const res = await client.query(text, values)
-//     } 
-//     catch (error) {
-//         console.log(error.stack)
-//     };
-// };
+    try {
+        const res = await client.query(text, values)
+    } 
+    catch (error) {
+        console.log(error.stack)
+    };
+};
 
 
 async function main() {
 
-    getFirstData();
+        
+        let browser = await puppeteer.launch({headless: false});
+        let page = await browser.newPage();
+        await login(page);
+        await getFirstData(page);
+        
+    
+    // getFirstData();
     // getSecondData();
 };
 
