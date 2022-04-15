@@ -1,3 +1,4 @@
+// I don't really need this file anymore, but will leave it for reference
 const PublicGoogleSheetsParser = require('public-google-sheets-parser');
 config = require('dotenv').config()
 const spreadsheetId = process.env.SPREADSHEET_ID

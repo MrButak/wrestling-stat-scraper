@@ -1,7 +1,7 @@
 const puppeteer = require('puppeteer');
-config = require('dotenv').config()
+config = require('dotenv').config();
 
-const { Pool, Client } = require('pg')
+const { Pool, Client } = require('pg');
 
 const client = new Client({
     connectionString: process.env.DATABASE_URL,
@@ -11,7 +11,6 @@ const client = new Client({
 });
 
 client.connect();
-
 
 // login to website
 async function login(page) {
@@ -36,7 +35,7 @@ async function login(page) {
     };
 };
 
-// Function creates the URLs where the data will be scraper
+// Function creates the URLs where the data will be scrapped
 async function getUrlData(page) {
 
     try {
@@ -65,7 +64,6 @@ async function getUrlData(page) {
             schoolShortName.push(optionsText[i].toLocaleLowerCase());
             schoolLinkObj[`${optionsText[i].split(' ').join('-').toLocaleLowerCase()}`] = optionsValue[i];
         };
-
         // create the urls
         Object.keys(schoolLinkObj).forEach((key) => {
             
@@ -80,6 +78,7 @@ async function getUrlData(page) {
     };
 };
 
+// Function gets the data I need from site
 async function getFirstData(page) {
 
     try {
@@ -123,7 +122,7 @@ async function getFirstData(page) {
                 return data;
             });
 
-            // build object from raw data
+            // build object from rawData
             let tmpStr = '';
             let tmpCnt = 1;
             let tmpArry = [];
@@ -156,10 +155,10 @@ async function getFirstData(page) {
     
             Object.keys(tmpObj).forEach((key) => {
                 
-                
                 scheduleObj.date.push(tmpObj[key][0].split('\n')[0]);
                 scheduleObj.type.push(tmpObj[key][1].split('\n')[0]);
 
+                // duals have a length of 6 and tournaments 5
                 switch(tmpObj[key].length) {
 
                     case 5:
@@ -255,7 +254,7 @@ async function insertInDb(scheduleObj, schoolShortName)  {
                     
                     let insertDbStm = 'INSERT INTO events (event_type, season_id, school_id, opponent_school_id, opponent_school_short_name, points, opponent_points, event_name, event_dates) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)';
                     let insertDbValues = [eventType, 1, schoolId, oppSchoolId, oppShortName, points, oppPoints, eventName, `{${eventDate}}`];
-                    await insertValues(insertDbStm, insertDbValues)
+                    await insertValues(insertDbStm, insertDbValues);
                 }
                 catch(err) {
                     console.log(err)
@@ -267,7 +266,6 @@ async function insertInDb(scheduleObj, schoolShortName)  {
             };
             
         }
-
         catch(err) {
             console.log(err);
         };
@@ -276,7 +274,7 @@ async function insertInDb(scheduleObj, schoolShortName)  {
     
   
 };
-
+// Function call inserts schedule data in db
 async function insertValues(insertDbStm, insertDbValues) {
     
     try {
@@ -288,7 +286,7 @@ async function insertValues(insertDbStm, insertDbValues) {
     };  
 };
 
-
+// Main Function calls
 async function main() {
 
         let browser = await puppeteer.launch({headless: false});
