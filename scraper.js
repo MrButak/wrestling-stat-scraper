@@ -12,11 +12,13 @@ const client = new Client({
 
 client.connect();
 
+
+// login to website
 async function login(page) {
 
     try {
         // navigate to login page
-        let URL = 'https://www.wrestlestat.com/account/login';
+        let URL = process.env.LOGIN_URL;
         await page.goto(URL);
         
         // login
@@ -32,56 +34,63 @@ async function login(page) {
     catch(err) {
         console.log(err);
     };
+};
 
+// Function creates the URLs where the data will be scraper
+async function getUrlData(page) {
+
+    try {
+        let schoolShortName = [];
+        let schoolLinkObj = {};
+        let urlArry = [];
+        let years = ['2022', '2020', '2018', '2016']
+        
+        URL = `https://www.wrestlestat.com/team/select`;
+        
+        await page.goto(URL, {
+            waitUntil: 'load',
+            timeout: 0
+        });
+        
+        // get data from site
+        const optionsText = await page.$$eval('option', (text) =>
+            text.map((option) => option.textContent)
+        );
+        
+        const optionsValue = await page.$$eval('option', (value) =>
+            value.map((value) => value.value)
+        );
+        
+        for(let i = 1; i < optionsText.length; i++) {
+            schoolShortName.push(optionsText[i].toLocaleLowerCase());
+            schoolLinkObj[`${optionsText[i].split(' ').join('-').toLocaleLowerCase()}`] = optionsValue[i];
+        };
+
+        // create the urls
+        Object.keys(schoolLinkObj).forEach((key) => {
+            
+            urlArry.push(`https://www.wrestlestat.com/season/${years[0]}/team/${schoolLinkObj[key]}/${key}/profile`);
+        });
+
+        return [urlArry, schoolShortName];
+    }
+
+    catch(err) {
+        console.log(err)
+    };
 };
 
 async function getFirstData(page) {
 
     try {
-
         
-        let years = ['2022', '2020', '2018', '2016']
-        let schools = ['air-force', 'american', 'appalachian-state', 'arizona-state', 'army', 'bellarmine', 'binghamton', 'bloomsburg',
-                    'brown', '*bucknell', 'buffalo', 'cal-baptist', 'cal-poly', 'campbell', 'central-michigan', 'chattanogga', 'clarion',
-                    'cleveland-state', 'columbia', 'cornell', 'csu-bakersfield', 'davidson', 'drexel', 'duke', 'edinboro', 'franklin-and-marshall',
-                    'gardner-webb', 'george-mason', 'harvard', 'hofstra', 'illinois', 'indiana', 'iowa', 'iowa-state', 'kent-state', 'lehigh', 'little-rock',
-                    'liu', 'lock-haven', 'maryland', 'michigan', 'michigan-state', 'minnesota', 'missouri', 'navy', 'nebraska', 'north-carolina', 'north-carolina-state',
-                    'north-dakota-state', 'northern-colorado', 'northern-illinois', 'northern-iowa', 'northwestern', 'ohio', 'ohio-state', 'oregon-state',
-                    'penn-state', 'pennsylvania', 'pittsburgh', 'princeton', 'purdue', 'rider', 'rutgers', 'sacred-heart', 'south-dakota-state', 'southern-illinois-edwardsville',
-                    'stanford', 'the-citadel', 'utah-valley', 'virginia', 'virginia-tech', 'vmi', 'west-virginia', 'wisconsin', 'wyoming'];
-
+        let [urlArry, schoolShortName] = await getUrlData(page);
+        let URL;
         
-        for(let i = 0; i < 80; i++) {
+        for(let i = 0; i < urlArry.length; i++) {
             
-            
-            // navigate to schedule page
-            if(schools[i] == 'pennsylvania') {
-                URL = 'https://www.wrestlestat.com/season/2022/team/61/pennsylvania/profile';
-            }
-            if(schools[i] == 'edinboro') {
-                URL = 'https://www.wrestlestat.com/season/2022/team/26/edinboro/profile';
-            }
+            URL = urlArry[i];
 
-            if(schools[i] == 'pittsburgh') {
-                URL = 'https://www.wrestlestat.com/season/2022/team/62/pittsburgh/profile';
-            }
-            if(schools[i] == 'bloomsburg') {
-                URL = 'https://www.wrestlestat.com/season/2022/team/7/bloomsburg/profile';
-            }
-            else if(schools[i] == 'franklin-and-marshall') {
-                URL = 'https://www.wrestlestat.com/season/2022/team/27/franklin-and-marshall/profile';
-            }
-            else if(schools[i] == 'brown') {
-                URL = 'https://www.wrestlestat.com/season/2022/team/10/brown/profile';
-            }
-            else if(schools[i] == 'bucknell') {
-                URL = 'https://www.wrestlestat.com/season/2022/team/11/bucknell/profile'
-            }
-            else {
-                URL = `https://www.wrestlestat.com/season/${years[0]}/team/${i + 1}/${schools[i]}/profile`;
-            };
-            
-            
             await page.goto(URL, {
                 waitUntil: 'load',
                 timeout: 0
@@ -136,13 +145,12 @@ async function getFirstData(page) {
                 tmpCnt++;
             };
             
-            
-            let tmpPointsArry = [];
             let scheduleObj = {
                 type: [],
                 date: [],
                 eventName: [],
                 points: [],
+                oppPoints: [],
                 oppName: []
             }
     
@@ -158,45 +166,45 @@ async function getFirstData(page) {
                         scheduleObj.eventName.push(tmpObj[key][2]);
                         scheduleObj.oppName.push(null);
                         scheduleObj.points.push(null);
-                        scheduleObj.points.push(null);
+                        scheduleObj.oppPoints.push(null);
                         break;
                     case 6:
                         scheduleObj.eventName.push(null);
                         scheduleObj.oppName.push(tmpObj[key][3].substring(tmpObj[key][3].indexOf(' ') + 1));
+
                         // determine what index score goes in by W or L
                         if(tmpObj[key][4].toLowerCase().includes('w')) {
 
                             if(tmpObj[key][5].split(' - ')[0] < tmpObj[key][5].split(' - ')[1]) {
-                                tmpPointsArry.unshift(tmpObj[key][5].split(' - ')[0]);
-                                tmpPointsArry.unshift(tmpObj[key][5].split(' - ')[1]);
+                                scheduleObj.points.push(tmpObj[key][5].split(' - ')[1]);
+                                scheduleObj.oppPoints.push(tmpObj[key][5].split(' - ')[0]);
                             }
                             else {
-                                tmpPointsArry.push(tmpObj[key][5].split(' - ')[0]);
-                                tmpPointsArry.push(tmpObj[key][5].split(' - ')[1]);
-                            }
+                                scheduleObj.points.push(tmpObj[key][5].split(' - ')[0]);
+                                scheduleObj.oppPoints.push(tmpObj[key][5].split(' - ')[1]);
+                            };
                         }
                         else {
                             if(tmpObj[key][5].split(' - ')[0] < tmpObj[key][5].split(' - ')[1]) {
-                                tmpPointsArry.push(tmpObj[key][5].split(' - ')[0]);
-                                tmpPointsArry.push(tmpObj[key][5].split(' - ')[1]);
+                                scheduleObj.points.push(tmpObj[key][5].split(' - ')[0]);
+                                scheduleObj.oppPoints.push(tmpObj[key][5].split(' - ')[1]);
                             }
                             else {
-                                tmpPointsArry.unshift(tmpObj[key][5].split(' - ')[0]);
-                                tmpPointsArry.unshift(tmpObj[key][5].split(' - ')[1]);
-                            }
+                                scheduleObj.points.push(tmpObj[key][5].split(' - ')[1]);
+                                scheduleObj.oppPoints.push(tmpObj[key][5].split(' - ')[0]);
+                            };
                         };
-                        scheduleObj.points.push(tmpPointsArry)
                         
-                };
-
-                tmpPointsArry = [];
-                
+                        
+                }; 
             });
-            console.log(scheduleObj);
-            console.log(URL)
-            console.log(schools[i], '^^^^^^^');
+
+            // console.log(scheduleObj);
+            // console.log(URL);
+            
             await page.evaluate(() => window.stop());
-            // await insertInDb(scheduleObj)
+            
+            await insertInDb(scheduleObj, schoolShortName[i])
         };
         
         
@@ -207,31 +215,86 @@ async function getFirstData(page) {
 };
 
 
-async function insertInDb()  {
+async function insertInDb(scheduleObj, schoolShortName)  {
 
-    const text = 'INSERT INTO purchases(stripe_pi, email, items_purchased, total_price, shipping_address, account_id) VALUES($1, $2, $3, $4, $5, $6) RETURNING *';
-    const values = [stripePiId, email, itemsPurchased, totalPrice, shippingAddress, null];
+    // loop through all items in object, inserting into db
+    let objKeyArr = Object.keys(scheduleObj);
+    for(let i = 0; i < scheduleObj[objKeyArr[0]].length; i++) {
 
+        try {
+
+            let eventType = scheduleObj['type'][i];
+            let eventDate = scheduleObj['date'][i];
+            let eventName = scheduleObj['eventName'][i];
+            let points = scheduleObj['points'][i];
+            let oppPoints = scheduleObj['oppPoints'][i];
+            let oppShortName = scheduleObj['oppName'][i];
+            let oppSchoolId;
+            let oppSchoolIdRaw;
+            
+            console.log(oppShortName, 'opponent');
+            console.log(schoolShortName, 'host');
+
+            let schoolIdStm = `SELECT school_id FROM schools WHERE short_name ILIKE '${schoolShortName}'`;
+            let oppSchoolIdStm = `SELECT school_id FROM schools WHERE short_name ILIKE '${oppShortName}'`;
+
+            try {
+
+                if(eventType.toLowerCase() == 'dual') {
+                    oppSchoolIdRaw = await client.query(oppSchoolIdStm);
+                    oppSchoolId = await oppSchoolIdRaw.rows[0].school_id;
+                }
+                else {
+                    oppSchoolId = null;
+                    oppShortName = null;
+                };
+                let schoolIdRaw = await client.query(schoolIdStm);
+                let schoolId = await schoolIdRaw.rows[0].school_id;
+                
+                try {
+                    
+                    let insertDbStm = 'INSERT INTO events (event_type, season_id, school_id, opponent_school_id, opponent_school_short_name, points, opponent_points, event_name, event_dates) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)';
+                    let insertDbValues = [eventType, 1, schoolId, oppSchoolId, oppShortName, points, oppPoints, eventName, `{${eventDate}}`];
+                    await insertValues(insertDbStm, insertDbValues)
+                }
+                catch(err) {
+                    console.log(err)
+                };
+                
+            }
+            catch(err) {
+                console.log(err)
+            };
+            
+        }
+
+        catch(err) {
+            console.log(err);
+        };
+        
+    }
+    
+  
+};
+
+async function insertValues(insertDbStm, insertDbValues) {
+    
     try {
-        const res = await client.query(text, values)
-    } 
-    catch (error) {
-        console.log(error.stack)
-    };
+        await client.query(insertDbStm, insertDbValues);
+        return
+    }
+    catch(err) {
+        console.log(err)
+    };  
 };
 
 
 async function main() {
 
-        
         let browser = await puppeteer.launch({headless: false});
         let page = await browser.newPage();
         await login(page);
         await getFirstData(page);
-        
-    
-    // getFirstData();
-    // getSecondData();
 };
 
 main();
