@@ -1,215 +1,103 @@
+// iowa, ohio state, cleveland state (can get objects, but deformed), virginia'', franlkin & marshall ''
 const puppeteer = require('puppeteer');
 config = require('dotenv').config();
 
-const { Pool, Client } = require('pg');
+const PublicGoogleSheetsParser = require('public-google-sheets-parser');
+const spreadsheetId = process.env.SPREADSHEET_ID
 
-const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
-});
+const fs = require('fs');
 
-client.connect();
+// const { Pool, Client } = require('pg');
+// const { captureRejections } = require('pg/lib/query');
 
-// login to website
-async function login(page) {
+// const client = new Client({
+//     connectionString: process.env.DATABASE_URL,
+//     ssl: {
+//         rejectUnauthorized: false
+//     }
+// });
 
-    try {
-        // navigate to login page
-        let URL = process.env.LOGIN_URL;
-        await page.goto(URL);
-        
-        // login
-        await page.type('.form-signin input[name="Username"]', process.env.USER_NAME);
-        await page.type('.form-signin input[name="Password"]', process.env.PASSWORD);
+// client.connect();
 
-        await Promise.all([
-            page.click('.form-signin .btn'),
-            page.waitForNavigation(),
-        ]);
-    }
 
-    catch(err) {
-        console.log(err);
-    };
-};
 
 // Function creates the URLs where the data will be scrapped
-async function getUrlData(page) {
+function getUrlData(page) {
 
-    try {
-        let schoolShortName = [];
-        let schoolLinkObj = {};
-        let urlArry = [];
-        let years = ['2022', '2020', '2018', '2016']
-        
-        URL = `https://www.wrestlestat.com/team/select`;
-        
-        await page.goto(URL, {
-            waitUntil: 'load',
-            timeout: 0
-        });
-        
-        // get data from site
-        const optionsText = await page.$$eval('option', (text) =>
-            text.map((option) => option.textContent)
-        );
-        
-        const optionsValue = await page.$$eval('option', (value) =>
-            value.map((value) => value.value)
-        );
-        
-        for(let i = 1; i < optionsText.length; i++) {
-            schoolShortName.push(optionsText[i].toLocaleLowerCase());
-            schoolLinkObj[`${optionsText[i].split(' ').join('-').toLocaleLowerCase()}`] = optionsValue[i];
+    let urlObj = {};
+    let queryString = '?grid=true';
+
+    const parser = new PublicGoogleSheetsParser(spreadsheetId);
+
+    parser.parse().then((items) => {
+
+        for(let i = 0; i < items.length; i++) {
+            urlObj[items[i].Short_Name] = items[i].school_url_schedule + '/' + queryString;
         };
-        // create the urls
-        Object.keys(schoolLinkObj).forEach((key) => {
-            
-            urlArry.push(`https://www.wrestlestat.com/season/${years[0]}/team/${schoolLinkObj[key]}/${key}/profile`);
-        });
-
-        return [urlArry, schoolShortName];
-    }
-
-    catch(err) {
-        console.log(err)
-    };
+        
+        getFirstData(urlObj, page);
+    });
 };
 
-// Function gets the data I need from site
-async function getFirstData(page) {
+// Function gets all team schecule data (except for iowa and ohio state), puts data into an array of objects, then writes to a text file the stringified schedule
+async function getFirstData(urlObj, page) {
 
-    try {
-        
-        let [urlArry, schoolShortName] = await getUrlData(page);
-        let URL;
-        
-        for(let i = 0; i < urlArry.length; i++) {
-            
-            URL = urlArry[i];
-
-            await page.goto(URL, {
-                waitUntil: 'load',
-                timeout: 0
-            });
-
-            // block loading of resources like images and css
-            // await page.setRequestInterception(true);
-            
-            // get table data
-            let rawData = await page.evaluate(() => {
-
-                let data = [];
-                let table = document.querySelectorAll('table')
-                table = table[4]; // there are 9+ tables on the page
-
-                for (var i = 1; i < table.rows.length; i++) {
-
-                    let objCells = table.rows.item(i).cells;
-
-                    let values = [];
-                    for (var j = 0; j < objCells.length; j++) {
-                        let text = objCells.item(j).textContent;
-                        values.push(text);
-                    };
-
-                    let d = { i, values };
-                    data.push(d);
-                };
-
-                return data;
-            });
-
-            // build object from rawData
-            let tmpStr = '';
-            let tmpCnt = 1;
-            let tmpArry = [];
-            let tmpObj = {};
-
-            for(let i = 0; i < rawData.length; i++) {
-
-                tmpStr = '';
-                tmpArry = [];
-
-                for(let j = 0; j < rawData[i].values.length; j++) {
-
-                    if(rawData[i].values[j].trim() == '') {continue};
-                    tmpStr = rawData[i].values[j].trim();
-                    tmpArry.push(tmpStr)
-                };
-
-                tmpObj[tmpCnt] = tmpArry;
-                tmpCnt++;
-            };
-            
-            let scheduleObj = {
-                type: [],
-                date: [],
-                eventName: [],
-                points: [],
-                oppPoints: [],
-                oppName: []
-            }
+    let URL;
+    let objKeys = Object.keys(urlObj)
     
-            Object.keys(tmpObj).forEach((key) => {
+    for(let i = 0; i < objKeys.length; i++) {
+        
+        // these two team schedules are in a different format
+        if(objKeys[i].toLowerCase() == 'iowa' || objKeys[i].toLowerCase() == 'ohio state') {continue};
+
+        try {
+            
+            URL = urlObj[objKeys[i]];
+            
+                await page.goto(URL, {
+                    waitUntil: 'load',
+                    timeout: 0
+                });
+
+                const tableHeaders = await page.$$eval('th', text => {
+                    return Array.from(text, content => {
+                        return content.textContent
+                    });
+                });
+                    
+                const result = await page.$$eval('table tr', rows => {
+                    return Array.from(rows, row => {
+                    const columns = row.querySelectorAll('td');
+                    return Array.from(columns, column => column.innerText);
+                    });
+                });
                 
-                scheduleObj.date.push(tmpObj[key][0].split('\n')[0]);
-                scheduleObj.type.push(tmpObj[key][1].split('\n')[0]);
+                let keyArr = Object.keys(result);
+                let schArry = [];
+                let schObj = {};
+                
 
-                // duals have a length of 6 and tournaments 5
-                switch(tmpObj[key].length) {
+                for(let j = 1; j < keyArr.length; j++) {
 
-                    case 5:
-                        scheduleObj.eventName.push(tmpObj[key][2]);
-                        scheduleObj.oppName.push(null);
-                        scheduleObj.points.push(null);
-                        scheduleObj.oppPoints.push(null);
-                        break;
-                    case 6:
-                        scheduleObj.eventName.push(null);
-                        scheduleObj.oppName.push(tmpObj[key][3].substring(tmpObj[key][3].indexOf(' ') + 1));
-
-                        // determine what index score goes in by W or L
-                        if(tmpObj[key][4].toLowerCase().includes('w')) {
-
-                            if(tmpObj[key][5].split(' - ')[0] < tmpObj[key][5].split(' - ')[1]) {
-                                scheduleObj.points.push(tmpObj[key][5].split(' - ')[1]);
-                                scheduleObj.oppPoints.push(tmpObj[key][5].split(' - ')[0]);
-                            }
-                            else {
-                                scheduleObj.points.push(tmpObj[key][5].split(' - ')[0]);
-                                scheduleObj.oppPoints.push(tmpObj[key][5].split(' - ')[1]);
-                            };
-                        }
-                        else {
-                            if(tmpObj[key][5].split(' - ')[0] < tmpObj[key][5].split(' - ')[1]) {
-                                scheduleObj.points.push(tmpObj[key][5].split(' - ')[0]);
-                                scheduleObj.oppPoints.push(tmpObj[key][5].split(' - ')[1]);
-                            }
-                            else {
-                                scheduleObj.points.push(tmpObj[key][5].split(' - ')[1]);
-                                scheduleObj.oppPoints.push(tmpObj[key][5].split(' - ')[0]);
-                            };
-                        };
+                    schObj = {};
+                    
+                    for(let k = 0; k < result[keyArr[j]].length; k++) {
                         
-                        
-                }; 
-            });
+                        schObj[tableHeaders[k]] = result[keyArr[j]][k];
+                    };
+                    
+                    schArry.push(schObj)
+                };
 
-            // console.log(scheduleObj);
-            // console.log(URL);
-            
-            await page.evaluate(() => window.stop());
-            
-            await insertInDb(scheduleObj, schoolShortName[i])
+                schArry = JSON.stringify(schArry)
+                
+                fs.writeFileSync (`./schedules/${objKeys[i]}.txt`, schArry)
+        }
+        
+        catch(err) {
+            console.log(err)
         };
-        
-        
-    }
-    catch(err) {
-        console.log(err);
+    
     };
 };
 
@@ -291,8 +179,9 @@ async function main() {
 
         let browser = await puppeteer.launch({headless: false});
         let page = await browser.newPage();
-        await login(page);
-        await getFirstData(page);
+        //await login(page);
+        //await getFirstData();
+        getUrlData(page)
 };
 
 main();

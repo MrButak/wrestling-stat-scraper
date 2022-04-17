@@ -18,7 +18,7 @@ async function getSchoolInfo() {
 
     const parser = new PublicGoogleSheetsParser(spreadsheetId)
     parser.parse().then((items) => {
-        insertIntoDb(items);
+        insertIntoDb(items)
     });
 };
 
