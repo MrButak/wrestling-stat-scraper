@@ -39,7 +39,7 @@ parser.parse().then((items) => {
                 // }
                 // console.log(Object.keys(schedule[0]))
                 Object.keys(schedule).forEach((key) => {
-                    // console.log(new Date(schedule[key].Date))
+                    console.log(new Date(schedule[key].Date))
                     console.log(schedule[key])
                     
                     
